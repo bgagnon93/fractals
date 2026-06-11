@@ -28,9 +28,14 @@ function maxIterForZoom(zoom: number): number {
 const DF_ZOOM_THRESHOLD = 1e4;
 const PERT_ZOOM_THRESHOLD = 1e12;
 
-function modeForZoom(zoom: number): RenderMode {
-  if (zoom >= PERT_ZOOM_THRESHOLD) return "pert";
-  if (zoom >= DF_ZOOM_THRESHOLD) return "df";
+// When the GPU's double-float arithmetic is broken (see probeDoubleFloat), the
+// df tier is useless — it degrades to f32. In that case we skip df entirely and
+// drop straight into perturbation at the f32 wall, which only needs robust f32
+// deltas on the GPU.
+function modeForZoom(zoom: number, dfOk: boolean): RenderMode {
+  const pertThreshold = dfOk ? PERT_ZOOM_THRESHOLD : DF_ZOOM_THRESHOLD;
+  if (zoom >= pertThreshold) return "pert";
+  if (dfOk && zoom >= DF_ZOOM_THRESHOLD) return "df";
   return "f32";
 }
 
@@ -46,6 +51,16 @@ async function main() {
 
   const renderer = new Renderer(gpu);
   const viewport = new Viewport(new HpCenter(-0.5, 0.0));
+
+  // Probe once: if df64 is unreliable on this GPU (e.g. Apple/Metal fast-math),
+  // skip the df tier and route into perturbation at the f32 wall instead.
+  const dfOk = await renderer.probeDoubleFloat();
+  if (!dfOk) {
+    console.warn(
+      "double-float arithmetic unreliable on this GPU (likely Metal fast-math reassociation); " +
+        "skipping df tier and using perturbation past the f32 limit."
+    );
+  }
 
   let dirty = true;
   const requestRedraw = () => {
@@ -96,7 +111,7 @@ async function main() {
       dirty = false;
       const zoom = viewport.zoom;
       const maxIter = maxIterForZoom(zoom);
-      const mode = modeForZoom(zoom);
+      const mode = modeForZoom(zoom, dfOk);
 
       const sceneParams = {
         isJulia: currentScene.isJulia,

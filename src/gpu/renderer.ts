@@ -5,6 +5,7 @@ import bindingsWGSL from "../shaders/lib/bindings.wgsl?raw";
 import driverF32WGSL from "../shaders/drivers/f32.wgsl?raw";
 import driverDfWGSL from "../shaders/drivers/df.wgsl?raw";
 import driverPertWGSL from "../shaders/drivers/pert.wgsl?raw";
+import probeWGSL from "../shaders/probe.wgsl?raw";
 import blitWGSL from "../shaders/blit.wgsl?raw";
 import type { Viewport, PreparedReference } from "../viewport.ts";
 import type { GpuContext } from "./device.ts";
@@ -148,6 +149,60 @@ export class Renderer {
     this.computeF32 = mk(this.computeLayout, prelude + "\n" + driverF32WGSL);
     this.computeDf = mk(this.computeLayout, prelude + "\n" + driverDfWGSL);
     this.computePert = mk(this.pertLayout, prelude + "\n" + driverPertWGSL);
+  }
+
+  /**
+   * One-shot compute pass that verifies the GPU's double-float arithmetic is
+   * intact. Some drivers (notably Apple/Metal under fast-math) reassociate float
+   * expressions, which collapses the error-free transforms in df.wgsl and
+   * silently degrades df64 to plain f32 — so the df tier stops extending the
+   * zoom range and detail breaks down right at the f32 wall (~1e6). Returns
+   * false on such devices so the caller can route around the df tier.
+   */
+  async probeDoubleFloat(): Promise<boolean> {
+    const layout = this.device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+      ],
+    });
+    const pipeline = this.device.createComputePipeline({
+      layout: this.device.createPipelineLayout({ bindGroupLayouts: [layout] }),
+      compute: {
+        module: this.device.createShaderModule({ code: dfWGSL + "\n" + probeWGSL }),
+        entryPoint: "main",
+      },
+    });
+    const outBuffer = this.device.createBuffer({
+      size: 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    });
+    const readBuffer = this.device.createBuffer({
+      size: 4,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
+    const bindGroup = this.device.createBindGroup({
+      layout,
+      entries: [{ binding: 0, resource: { buffer: outBuffer } }],
+    });
+
+    const encoder = this.device.createCommandEncoder();
+    const pass = encoder.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.dispatchWorkgroups(1);
+    pass.end();
+    encoder.copyBufferToBuffer(outBuffer, 0, readBuffer, 0, 4);
+    this.device.queue.submit([encoder.finish()]);
+
+    await readBuffer.mapAsync(GPUMapMode.READ);
+    const errLimb = new Float32Array(readBuffer.getMappedRange())[0];
+    readBuffer.unmap();
+    outBuffer.destroy();
+    readBuffer.destroy();
+
+    // Correct two_sum(1.0, 1e-20) yields an error limb ~1e-20; fast-math
+    // reassociation yields exactly 0. Threshold generously between the two.
+    return Math.abs(errLimb) > 1e-25;
   }
 
   /** Swap the active fractal formula, rebuilding the compute pipelines. */
