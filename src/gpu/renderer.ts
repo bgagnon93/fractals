@@ -74,7 +74,15 @@ export class Renderer {
   private f32 = new Float32Array(this.uniformData);
   private u32 = new Uint32Array(this.uniformData);
 
-  // Recreated on resize:
+  // Output (canvas/context) size, set by resize(). The compute target is
+  // rendered at outWidth*renderScale and upscaled to this by the blit pass.
+  private outWidth = 0;
+  private outHeight = 0;
+  // Quality knob in (0,1]: 1 = native resolution. Driven by the adaptive loop.
+  private renderScale = 1;
+
+  // Recreated on resize / render-scale change. texWidth/texHeight are the
+  // *compute target* dimensions (output * renderScale), not the canvas size.
   private targetTex!: GPUTexture;
   private targetView!: GPUTextureView;
   private computeBindGroup!: GPUBindGroup;
@@ -133,7 +141,9 @@ export class Renderer {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    this.sampler = this.device.createSampler({ magFilter: "nearest", minFilter: "nearest" });
+    // Linear so the upscaled low-resolution target reads smoothly (at scale 1
+    // the target matches the output and this is effectively a 1:1 copy).
+    this.sampler = this.device.createSampler({ magFilter: "linear", minFilter: "linear" });
   }
 
   private buildComputePipelines(fractalWgsl: string) {
@@ -212,6 +222,33 @@ export class Renderer {
   }
 
   resize(width: number, height: number) {
+    if (width === this.outWidth && height === this.outHeight) return;
+    this.outWidth = width;
+    this.outHeight = height;
+    this.allocTarget();
+  }
+
+  /**
+   * Set the render-quality scale in (0,1]: the compute target is sized to
+   * outWidth*scale and upscaled to the canvas by the blit. Lower scale trades
+   * sharpness for far fewer per-pixel iterations. No-op if the resulting target
+   * dimensions are unchanged, so callers can drive it freely.
+   */
+  setRenderScale(scale: number) {
+    const s = Math.min(1, Math.max(0.1, scale));
+    if (s === this.renderScale) return;
+    this.renderScale = s;
+    if (this.outWidth > 0) this.allocTarget();
+  }
+
+  get currentRenderScale() {
+    return this.renderScale;
+  }
+
+  /** (Re)create the compute target and its bind groups at outSize*renderScale. */
+  private allocTarget() {
+    const width = Math.max(1, Math.round(this.outWidth * this.renderScale));
+    const height = Math.max(1, Math.round(this.outHeight * this.renderScale));
     if (width === this.texWidth && height === this.texHeight) return;
     this.texWidth = width;
     this.texHeight = height;
@@ -274,13 +311,18 @@ export class Renderer {
     this.f32[3] = cyLo;
     this.f32[4] = this.texWidth;
     this.f32[5] = this.texHeight;
+    // The target covers the same complex span as the full output with fewer
+    // pixels, so the complex distance per target pixel grows by outWidth/texWidth
+    // (= 1/renderScale, modulo rounding). The shader maps pixels via u.resolution
+    // (= target size) and this scale, so the on-screen span is unchanged.
+    const pixelScale = viewport.scale * (this.outWidth / this.texWidth);
     if (mode === "pert") {
       // Pass scale*F (rescaled); plain scale would underflow f32 past ~1e35.
-      this.f32[6] = viewport.scale * RESCALE_F;
+      this.f32[6] = pixelScale * RESCALE_F;
       this.f32[7] = 0;
       this.f32[10] = RESCALE_INV_F;
     } else {
-      const [sHi, sLo] = splitDouble(viewport.scale);
+      const [sHi, sLo] = splitDouble(pixelScale);
       this.f32[6] = sHi;
       this.f32[7] = sLo;
     }
