@@ -1,0 +1,12 @@
+# Node
+node_modules/
+
+# Build output
+dist/
+
+# Rust / wasm-pack
+perturbation/target/
+src/wasm/
+
+# Editor / tool state
+.claude/

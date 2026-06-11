@@ -1,0 +1,18 @@
+[package]
+name = "perturbation"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+astro-float = "0.9"
+# astro-float pulls in getrandom; on wasm32-unknown-unknown it needs the "js"
+# feature to compile (even though we don't use randomness).
+getrandom = { version = "0.2", features = ["js"] }
+
+[profile.release]
+opt-level = 3
+lto = true

@@ -1,0 +1,17 @@
+{
+  "name": "fractals",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "build:wasm": "wasm-pack build perturbation --target web --out-dir ../src/wasm --out-name perturbation --release"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.40",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
+  }
+}

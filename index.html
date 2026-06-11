@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mandelbrot</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+      #gpu-canvas { display: block; width: 100vw; height: 100vh; cursor: grab; }
+      #gpu-canvas.dragging { cursor: grabbing; }
+      #hud {
+        position: fixed; top: 8px; left: 8px;
+        font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #cfe; background: rgba(0,0,0,0.45); padding: 6px 8px;
+        border-radius: 6px; pointer-events: none; white-space: pre;
+      }
+      #scene {
+        position: fixed; top: 8px; right: 8px;
+        font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #cfe; background: rgba(0,0,0,0.55); border: 1px solid #345;
+        border-radius: 6px; padding: 4px 6px;
+      }
+      #error {
+        position: fixed; inset: 0; display: none; place-items: center;
+        color: #fbb; background: #200; font: 14px/1.5 ui-monospace, monospace;
+        padding: 2rem; text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gpu-canvas"></canvas>
+    <select id="scene"></select>
+    <div id="hud"></div>
+    <div id="error"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

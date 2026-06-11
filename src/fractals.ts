@@ -1,0 +1,57 @@
+import mandelbrotWGSL from "./shaders/fractals/mandelbrot.wgsl?raw";
+import multibrotWGSL from "./shaders/fractals/multibrot.wgsl?raw";
+
+/**
+ * A fractal is defined by its iteration formula, encoded once as a WGSL module
+ * that provides `fractal_step` / `fractal_step_df` / `fractal_pstep` (see
+ * shaders/fractals/mandelbrot.wgsl). The drivers and all precision/perturbation
+ * machinery are formula-agnostic, so adding an analytic fractal is mostly a new
+ * entry here plus a matching reference step on the Rust side.
+ */
+export interface Fractal {
+  name: string;
+  /** WGSL source defining the fractal_* functions. */
+  wgsl: string;
+}
+
+export const MANDELBROT: Fractal = {
+  name: "Mandelbrot",
+  wgsl: mandelbrotWGSL,
+};
+
+// Multibrot family z^d + c. The WGSL reads the exponent from the `power`
+// uniform, so one module covers every d (and combines with the Julia flag).
+export const MULTIBROT: Fractal = {
+  name: "Multibrot",
+  wgsl: multibrotWGSL,
+};
+
+/**
+ * A selectable scene. Mandelbrot/Julia share the z²+c module (differing only in
+ * whether the screen maps to c or to the seed z0). Multibrot scenes use the
+ * power-parameterized module — a different WGSL, so switching to/from them
+ * rebuilds the compute pipelines (cheap, only on scene change).
+ */
+export interface Scene {
+  name: string;
+  fractal: Fractal;
+  power: number; // multibrot exponent d (2 for the z²+c module)
+  isJulia: boolean;
+  juliaC: { x: number; y: number }; // ignored unless isJulia
+  center: { x: number; y: number };
+  span: number; // initial complex width
+}
+
+const M = MANDELBROT;
+const MB = MULTIBROT;
+
+export const SCENES: Scene[] = [
+  { name: "Mandelbrot", fractal: M, power: 2, isJulia: false, juliaC: { x: 0, y: 0 }, center: { x: -0.5, y: 0 }, span: 3.5 },
+  { name: "Julia −0.8 + 0.156i", fractal: M, power: 2, isJulia: true, juliaC: { x: -0.8, y: 0.156 }, center: { x: 0, y: 0 }, span: 3.5 },
+  { name: "Julia −0.70176 − 0.3842i", fractal: M, power: 2, isJulia: true, juliaC: { x: -0.70176, y: -0.3842 }, center: { x: 0, y: 0 }, span: 3.2 },
+  { name: "Julia 0.285 + 0.01i", fractal: M, power: 2, isJulia: true, juliaC: { x: 0.285, y: 0.01 }, center: { x: 0, y: 0 }, span: 3.0 },
+  { name: "Multibrot d=3", fractal: MB, power: 3, isJulia: false, juliaC: { x: 0, y: 0 }, center: { x: 0, y: 0 }, span: 3.0 },
+  { name: "Multibrot d=4", fractal: MB, power: 4, isJulia: false, juliaC: { x: 0, y: 0 }, center: { x: 0, y: 0 }, span: 3.0 },
+  { name: "Multibrot d=5", fractal: MB, power: 5, isJulia: false, juliaC: { x: 0, y: 0 }, center: { x: 0, y: 0 }, span: 3.0 },
+  { name: "Multibrot-Julia d=3 (0.4)", fractal: MB, power: 3, isJulia: true, juliaC: { x: 0.4, y: 0 }, center: { x: 0, y: 0 }, span: 3.0 },
+];
