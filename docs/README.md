@@ -1,3 +1,7 @@
+# Disclaimer
+
+I didn't make this, I just wanted it to exist, and to host it.
+
 # Fractals — deep-zoom explorer
 
 A GPU-accelerated, effectively-infinite-zoom explorer for the Mandelbrot set,
