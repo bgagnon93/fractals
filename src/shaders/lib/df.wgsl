@@ -66,3 +66,11 @@ fn df_mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
 fn df_mul_pow2(a: vec2<f32>, s: f32) -> vec2<f32> {
   return vec2<f32>(a.x * s, a.y * s);
 }
+
+// Absolute value: the value's sign is the sign of the hi limb, so negate both.
+fn df_abs(a: vec2<f32>) -> vec2<f32> {
+  if (a.x < 0.0) {
+    return vec2<f32>(-a.x, -a.y);
+  }
+  return a;
+}

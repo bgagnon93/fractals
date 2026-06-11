@@ -63,7 +63,9 @@ async function main() {
   function applyScene(scene: Scene) {
     currentScene = scene;
     renderer.setFractal(scene.fractal); // rebuilds pipelines only if the formula changed
+    viewport.setFormula(scene.fractal.formula);
     viewport.setPower(scene.power);
+    viewport.setFlipY(scene.flipY ?? false);
     viewport.setJulia(scene.isJulia, scene.juliaC.x, scene.juliaC.y);
     viewport.reset(scene.center.x, scene.center.y, scene.span);
     requestRedraw();
@@ -100,6 +102,7 @@ async function main() {
         isJulia: currentScene.isJulia,
         juliaC: currentScene.juliaC,
         power: currentScene.power,
+        flipY: currentScene.flipY ?? false,
       };
       let refInfo = "";
       if (mode === "pert") {

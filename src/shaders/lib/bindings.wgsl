@@ -17,6 +17,8 @@ struct Uniforms {
   juliaCLo: vec2<f32>,   // Julia constant (lo limbs, for the df tier)
   refOffsetHat: vec2<f32>, // pert only: (center - reference center) * F (cached-orbit reuse)
   power: u32,            // multibrot exponent d (2 = Mandelbrot)
+  ySign: f32,            // +1: +imaginary up (default); -1: display mirrored
+                         // vertically (canonical Burning Ship orientation)
 };
 
 @group(0) @binding(0) var<uniform> u: Uniforms;

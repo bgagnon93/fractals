@@ -9,7 +9,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
 
   let offx = f32(gid.x) - u.resolution.x * 0.5;
-  let offy = -(f32(gid.y) - u.resolution.y * 0.5);
+  let offy = -(f32(gid.y) - u.resolution.y * 0.5) * u.ySign;
 
   let scale = vec2<f32>(u.scale, u.scaleLo);
   let wx = df_add(vec2<f32>(u.centerHi.x, u.centerLo.x), df_mul(df_from(offx), scale));

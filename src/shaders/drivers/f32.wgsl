@@ -9,7 +9,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
 
   let offx = f32(gid.x) - u.resolution.x * 0.5;
-  let offy = -(f32(gid.y) - u.resolution.y * 0.5); // flip y -> +imaginary up
+  let offy = -(f32(gid.y) - u.resolution.y * 0.5) * u.ySign; // +imaginary up (down if mirrored)
   let w = u.centerHi + vec2<f32>(offx, offy) * u.scale; // screen coordinate
 
   // Mandelbrot: screen is c, seed 0. Julia: screen is z0, c is fixed.

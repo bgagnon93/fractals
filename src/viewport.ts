@@ -23,6 +23,8 @@ export class Viewport {
   scale = 0; // 0 => first setSize() adopts INITIAL_SPAN
   width = 1;
   height = 1;
+  /** +1: +imaginary up (default); -1: display mirrored vertically (Burning Ship). */
+  ySign = 1;
 
   private static readonly INITIAL_SPAN = 3.5;
 
@@ -68,16 +70,27 @@ export class Viewport {
     this.cache = null;
   }
 
+  /** Select the reference-orbit formula (FORMULA_* in fractals.ts). */
+  setFormula(formula: number) {
+    this.hp.setFormula(formula);
+    this.cache = null;
+  }
+
+  /** Mirror the display vertically (canonical Burning Ship orientation). */
+  setFlipY(flip: boolean) {
+    this.ySign = flip ? -1 : 1;
+  }
+
   /** Drag the view by a device-pixel delta. */
   panByPixels(dx: number, dy: number) {
     // Complex-plane shift; small * small stays accurate in f64.
-    this.hp.translate(-dx * this.scale, dy * this.scale);
+    this.hp.translate(-dx * this.scale, dy * this.scale * this.ySign);
   }
 
   /** Zoom by `factor` (<1 zooms in) keeping the point under (px,py) fixed. */
   zoomAt(px: number, py: number, factor: number) {
     const offX = px - this.width / 2;
-    const offY = -(py - this.height / 2); // complex y is flipped
+    const offY = -(py - this.height / 2) * this.ySign; // screen y -> imaginary axis
     const scaleOld = this.scale;
     const scaleNew = scaleOld * factor;
     // Center shift that keeps the cursor's complex point fixed:

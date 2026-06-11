@@ -26,6 +26,7 @@ import { MANDELBROT, type Fractal } from "../fractals.ts";
 //   juliaCLo   vec2<f32> @ 64    (16,17)
 //   refOffsetHat vec2<f32> @ 72  (18,19)  perturbation only
 //   power      u32       @ 80    (20)
+//   ySign      f32       @ 84    (21)  +1 normal, -1 mirrored display
 //   (pad to 96)
 const UNIFORM_SIZE = 96;
 
@@ -44,6 +45,7 @@ export interface SceneParams {
   isJulia: boolean;
   juliaC: { x: number; y: number };
   power: number;
+  flipY: boolean;
 }
 
 /** Split a JS double into a hi/lo pair of f32 (a double-float). */
@@ -241,6 +243,7 @@ export class Renderer {
     this.f32[18] = (pert ? pert.refOffset.x : 0) * RESCALE_F;
     this.f32[19] = (pert ? pert.refOffset.y : 0) * RESCALE_F;
     this.u32[20] = scene.power;
+    this.f32[21] = scene.flipY ? -1 : 1;
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData);
 
     // Select pipeline + bind group.

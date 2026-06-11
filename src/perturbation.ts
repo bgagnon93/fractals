@@ -60,6 +60,11 @@ export class HpCenter {
     this.view.set_power(power);
   }
 
+  /** Select the reference-orbit formula (FORMULA_* in fractals.ts). */
+  setFormula(formula: number): void {
+    this.view.set_formula(formula);
+  }
+
   /** Current center minus the last computed reference center (small f64). */
   refOffset(): { x: number; y: number } {
     return { x: this.view.ref_offset_re(), y: this.view.ref_offset_im() };

@@ -125,6 +125,34 @@ fn fractal_step(
     (rr.add(cx, p, RM), ri.add(cy, p, RM))
 }
 
+fn bf_abs(v: &BigFloat) -> BigFloat {
+    if v.is_negative() {
+        v.neg()
+    } else {
+        v.clone()
+    }
+}
+
+/// One Burning Ship reference step: z -> (|Re z| + i|Im z|)^2 + c.
+fn burning_ship_step(
+    zr: &BigFloat,
+    zi: &BigFloat,
+    cx: &BigFloat,
+    cy: &BigFloat,
+    p: usize,
+) -> (BigFloat, BigFloat) {
+    let a = bf_abs(zr);
+    let b = bf_abs(zi);
+    let two = BigFloat::from_f64(2.0, p);
+    let re = a.mul(&a, p, RM).sub(&b.mul(&b, p, RM), p, RM).add(cx, p, RM);
+    let im = a.mul(&b, p, RM).mul(&two, p, RM).add(cy, p, RM);
+    (re, im)
+}
+
+/// Reference-orbit formula selector (matches the active WGSL fractal module).
+const FORMULA_MULTIBROT: u32 = 0;
+const FORMULA_BURNING_SHIP: u32 = 1;
+
 /// The view center, held at arbitrary precision so pan/zoom can keep
 /// accumulating sub-f64 deltas indefinitely. The GPU never sees this value; it
 /// only feeds the (CPU-side) reference-orbit computation and the f64 readback
@@ -139,7 +167,8 @@ pub struct View {
     is_julia: bool,
     jc_re: f64,
     jc_im: f64,
-    power: u32, // multibrot exponent (2 = Mandelbrot)
+    power: u32,   // multibrot exponent (2 = Mandelbrot)
+    formula: u32, // FORMULA_MULTIBROT | FORMULA_BURNING_SHIP
     // Center at which the last reference orbit was computed; lets the GPU reuse
     // a cached orbit while the view drifts (offset = current center - this).
     ref_cx: BigFloat,
@@ -160,6 +189,7 @@ impl View {
             jc_re: 0.0,
             jc_im: 0.0,
             power: 2,
+            formula: FORMULA_MULTIBROT,
             ref_cx: BigFloat::from_f64(0.0, prec),
             ref_cy: BigFloat::from_f64(0.0, prec),
             has_ref: false,
@@ -201,6 +231,11 @@ impl View {
     /// Set the multibrot exponent d (2 = Mandelbrot).
     pub fn set_power(&mut self, power: u32) {
         self.power = power.max(2);
+    }
+
+    /// Select the reference-orbit formula (0 = multibrot, 1 = burning ship).
+    pub fn set_formula(&mut self, formula: u32) {
+        self.formula = formula;
     }
 
     /// Grow (or shrink) working precision; the stored center is re-rounded.
@@ -271,7 +306,11 @@ impl View {
         let mut escaped = false;
         let mut n = 0u32;
         while n < max_iter {
-            let (nzr, nzi) = fractal_step(&zr, &zi, &cx, &cy, self.power, p);
+            let (nzr, nzi) = if self.formula == FORMULA_BURNING_SHIP {
+                burning_ship_step(&zr, &zi, &cx, &cy, p)
+            } else {
+                fractal_step(&zr, &zi, &cx, &cy, self.power, p)
+            };
             zr = nzr;
             zi = nzi;
             fr = bigfloat_to_f64(&zr);
@@ -353,6 +392,29 @@ mod tests {
             // (zr + i zi)^3 = zr^3 - 3 zr zi^2 + i(3 zr^2 zi - zi^3)
             let nzr = zr * zr * zr - 3.0 * zr * zi * zi + cx;
             let nzi = 3.0 * zr * zr * zi - zi * zi * zi + cy;
+            zr = nzr;
+            zi = nzi;
+            if (n as u32) < r.points {
+                let tol = 1e-5 * zr.abs().max(zi.abs()).max(1.0);
+                assert!((r.orbit[n * 2] as f64 - zr).abs() <= tol, "re n={n}");
+                assert!((r.orbit[n * 2 + 1] as f64 - zi).abs() <= tol, "im n={n}");
+            }
+        }
+    }
+
+    #[test]
+    fn burning_ship_reference() {
+        // formula=1 reference must match a naive f64 Burning Ship orbit.
+        let mut view = View::new(-0.5, -0.5);
+        view.set_formula(1);
+        let r = view.compute_reference(20);
+        let (cx, cy) = (-0.5f64, -0.5f64);
+        let (mut zr, mut zi) = (0.0f64, 0.0f64);
+        for n in 1..=20usize {
+            let a = zr.abs();
+            let b = zi.abs();
+            let nzr = a * a - b * b + cx;
+            let nzi = 2.0 * a * b + cy;
             zr = nzr;
             zi = nzi;
             if (n as u32) < r.points {

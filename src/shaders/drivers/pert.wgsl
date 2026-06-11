@@ -17,7 +17,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let F = 1.0 / invF;  // = 2^108, exact (reciprocal of a power of two)
 
   let offx = f32(gid.x) - u.resolution.x * 0.5;
-  let offy = -(f32(gid.y) - u.resolution.y * 0.5);
+  let offy = -(f32(gid.y) - u.resolution.y * 0.5) * u.ySign;
   // Rescaled offset of this pixel from the REFERENCE center. The reference may
   // be slightly off-screen (cached across small pans), hence + refOffsetHat.
   let pixelHat = vec2<f32>(offx, offy) * u.scale + u.refOffsetHat;
